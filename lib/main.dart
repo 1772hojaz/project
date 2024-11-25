@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(SalesPredictionApp());
@@ -26,33 +28,77 @@ class SalesPredictionHome extends StatefulWidget {
 
 class _SalesPredictionHomeState extends State<SalesPredictionHome> {
   final TextEditingController itemMRPController = TextEditingController();
-  final TextEditingController establishmentYearController =
-      TextEditingController();
-
-  String selectedOutlet = 'OUT010'; // Default to a valid identifier
-  String selectedSize = 'Large'; // Default to a valid size
-  String selectedType = 'Supermarket Type1'; // Default to a valid type
+  final TextEditingController outletYearsController = TextEditingController();
 
   String result = '';
+  String selectedOutletSize = "small";
+  String selectedOutletLocationType = "Tier1";
+  String selectedOutletType = "0";
+  String selectedNewItemType = "Food";
 
-  void showResult() {
-    // Placeholder for prediction logic
-    double dummyPrediction = 1000.0; // Replace with model prediction logic
-    setState(() {
-      result = 'Predicted Sales: \$${dummyPrediction.toStringAsFixed(2)}';
-    });
+  final List<String> outletSizes = ["small", "medium", "large"];
+  final List<String> outletLocationTypes = ["Tier1", "Tier2", "Tier3"];
+  final List<String> outletTypes = ["0", "1", "2", "3"];
+  final List<String> newItemTypes = ["Food", "Drinks", "Non-Consumable"];
+
+  Future<void> showResult() async {
+    try {
+      final itemMRP = double.tryParse(itemMRPController.text);
+      final outletYears = int.tryParse(outletYearsController.text);
+
+      if (itemMRP == null || outletYears == null) {
+        setState(() {
+          result = 'Please enter valid numeric values for all fields.';
+        });
+        return;
+      }
+
+      // Map Outlet_Size values to integers
+      final outletSizeMapping = {
+        "small": 1,
+        "medium": 2,
+        "large": 3,
+      };
+
+      var requestData = {
+        'Item_MRP': itemMRP,
+        'Outlet_Size': outletSizeMapping[selectedOutletSize],
+        'Outlet_Location_Type':
+            outletLocationTypes.indexOf(selectedOutletLocationType) + 1,
+        'Outlet_Type': int.parse(selectedOutletType),
+        'New_Item_Type': newItemTypes.indexOf(selectedNewItemType) + 1,
+        'Outlet_Years': outletYears,
+      };
+
+      final response = await http.post(
+        Uri.parse('https://regression-model.onrender.com/predict'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(requestData),
+      );
+
+      if (response.statusCode == 200) {
+        var prediction = json.decode(response.body);
+        setState(() {
+          result =
+              'Predicted Sales: \$${prediction['prediction'].toStringAsFixed(2)}';
+        });
+      } else {
+        setState(() {
+          result = 'Error: ${response.reasonPhrase}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        result = 'Request failed: $e';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Sales Prediction',
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
+        title: const Text('Sales Prediction'),
         elevation: 0,
         backgroundColor: Colors.blue[800],
         centerTitle: true,
@@ -62,7 +108,7 @@ class _SalesPredictionHomeState extends State<SalesPredictionHome> {
         child: Column(
           children: [
             Container(
-              padding: EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -71,188 +117,62 @@ class _SalesPredictionHomeState extends State<SalesPredictionHome> {
                     color: Colors.grey.withOpacity(0.3),
                     blurRadius: 10,
                     spreadRadius: 3,
-                    offset: Offset(0, 5),
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Item Price",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
-                        fontSize: 16),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: itemMRPController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter item price',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.blue[50],
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  SizedBox(height: 20),
-                  // Store Identifier
-                  Text(
-                    "Store Identifier",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
-                        fontSize: 16),
-                  ),
-                  SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: selectedOutlet,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedOutlet = value!;
-                      });
-                    },
-                    items: [
-                      'OUT010',
-                      'OUT013',
-                      'OUT017',
-                      'OUT018',
-                      'OUT019',
-                      'OUT027',
-                      'OUT035',
-                      'OUT045',
-                      'OUT046',
-                      'OUT049'
-                    ].map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.blue[50],
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Store Size
-                  Text(
-                    "Store Size",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
-                        fontSize: 16),
-                  ),
-                  SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: selectedSize,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedSize = value!;
-                      });
-                    },
-                    items: ['Large', 'Medium', 'Small']
-                        .map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.blue[50],
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Store Type
-                  Text(
-                    "Grocery Store Type",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
-                        fontSize: 16),
-                  ),
-                  SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: selectedType,
-                    onChanged: (value) {
-                      setState(() {
-                        selectedType = value!;
-                      });
-                    },
-                    items: [
-                      'Supermarket Type1',
-                      'Supermarket Type2',
-                      'Supermarket Type3'
-                    ].map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.blue[50],
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Establishment Year
-                  Text(
-                    "Outlet Establishment Year",
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[700],
-                        fontSize: 16),
-                  ),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: establishmentYearController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter year',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.blue[50],
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  SizedBox(height: 30),
-                  // Predict Button
+                  buildInputField('Item MRP', 'Enter item MRP',
+                      itemMRPController, TextInputType.number),
+                  buildInputField('Outlet Years', 'Enter outlet years',
+                      outletYearsController, TextInputType.number),
+                  buildDropdown('Outlet Size', outletSizes, selectedOutletSize,
+                      (newValue) {
+                    setState(() {
+                      selectedOutletSize = newValue!;
+                    });
+                  }),
+                  buildDropdown('Outlet Location Type', outletLocationTypes,
+                      selectedOutletLocationType, (newValue) {
+                    setState(() {
+                      selectedOutletLocationType = newValue!;
+                    });
+                  }),
+                  buildDropdown(
+                      'Outlet Type (0-3)', outletTypes, selectedOutletType,
+                      (newValue) {
+                    setState(() {
+                      selectedOutletType = newValue!;
+                    });
+                  }),
+                  buildDropdown(
+                      'New Item Type', newItemTypes, selectedNewItemType,
+                      (newValue) {
+                    setState(() {
+                      selectedNewItemType = newValue!;
+                    });
+                  }),
+                  const SizedBox(height: 30),
                   SizedBox(
-                    width: double.infinity, // Full-width button
+                    width: double.infinity,
                     child: ElevatedButton(
                       onPressed: showResult,
                       style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 15),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         backgroundColor: Colors.blue[800],
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Predict',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color:
-                              Colors.white, // Change this to the desired color
-                        ),
+                        style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   if (result.isNotEmpty)
                     Center(
                       child: Text(
@@ -270,6 +190,65 @@ class _SalesPredictionHomeState extends State<SalesPredictionHome> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget buildInputField(String label, String hint,
+      TextEditingController controller, TextInputType keyboardType) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blue[700],
+              fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            filled: true,
+            fillColor: Colors.blue[50],
+          ),
+          keyboardType: keyboardType,
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget buildDropdown(String label, List<String> items, String selectedItem,
+      ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blue[700],
+              fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        DropdownButton<String>(
+          value: selectedItem,
+          isExpanded: true,
+          onChanged: onChanged,
+          items: items.map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }
